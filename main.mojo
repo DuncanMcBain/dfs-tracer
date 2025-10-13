@@ -94,6 +94,9 @@ struct Vec3[#T:
     fn len(self) -> Float32:
         return sqrt((self.data * self.data).reduce_add())
 
+    fn len_sq(self) -> Float32:
+        return (self.data * self.data).reduce_add()
+
 fn dot(lhs: Vector, rhs: Vector) -> Float32:
     return (lhs.data * rhs.data).reduce_add()
 
@@ -120,8 +123,10 @@ fn unit(v: Vector) -> Vector:
     return v / v.len()
 
 fn sky(ray: Ray) -> Colour:
-    if hit(Point(0, 0, -1), 0.5, ray):
-        return Colour(1, 0, 0)
+    t = hit(Point(0, 0, -1), 0.5, ray)
+    if t > 0:
+        norm = unit(ray.at(t) - Vector(0, 0, -1))
+        return 0.5 * Colour(norm.x() + 1, norm.y() + 1, norm.z() + 1)
     var unit_dir: Vector = unit(ray.dir)
     a = 0.5 * (unit_dir.y() + 1.0)
     return (1.0 - a) * Colour(1.0, 1.0, 1.0) + a * Colour(0.5, 0.7, 1.0)
@@ -133,13 +138,13 @@ fn convert(colour: Colour) -> InlineArray[UInt8, 3]:
     ret[2] = Int(colour.z() * 255.99)
     return ret
 
-fn hit(centre: Point, radius: Float32, r: Ray) -> Bool:
-    oc = centre - r.origin
-    a = dot(r.dir, r.dir)
-    b = -2.0 * dot(r.dir, oc)
-    c = dot(oc, oc) - radius * radius
-    disc = b * b - 4 * a * c
-    return disc > 0
+fn hit(centre: Point, radius: Float32, ray: Ray) -> Float32:
+    oc = centre - ray.origin
+    a = ray.dir.len_sq()
+    h = dot(ray.dir, oc)
+    c = oc.len_sq() - radius * radius
+    disc = h * h - a * c
+    return -1.0 if disc < 0 else (h - sqrt(disc)) / a
 
 def main():
     print("test")
