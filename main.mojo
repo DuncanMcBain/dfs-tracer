@@ -1,6 +1,4 @@
-from math import Ceilable, CeilDivable, Floorable, Truncable, sqrt
-from builtin.device_passable import DevicePassable
-from builtin.math import Absable, Powable
+from math import sqrt
 
 struct PointTag(Copyable):
     pass
@@ -13,37 +11,20 @@ struct VectorTag(Copyable):
 struct ColourTag(Copyable):
     pass
 
-trait Negatable:
-    fn __neg__(self) -> Self:
-        ...
 
-trait Multiplyable:
-    fn __mul__(self, other: Self) -> Self:
-        ...
+fn is_same[T: AnyType, U: AnyType](t: T, u: U) -> Bool:
+    return False
 
-alias Point = Vec3[PointTag]
-alias Vector = Vec3[VectorTag]
-# extending this somehow with r() g() b() functions would be nice but meh
-alias Colour = Vec3[ColourTag]
+fn is_same[T: AnyType](t: T, tt: T) -> Bool:
+    return True
+
+alias Point[T: DType] = Vec3[T, PointTag]
+alias Vector[T: DType] = Vec3[T, VectorTag]
+alias Colour[T: DType] = Vec3[T, ColourTag]
 
 @register_passable("trivial")
-struct Vec3[#T:
-    #Absable &
-    #Comparable &
-    #Copyable &
-    #Defaultable &
-    #DevicePassable &
-    #Floorable &
-    #Intable &
-    #Movable &
-    #Powable &
-    #Truncable,
-    Tag: AnyType]():
-
-    #var data: SIMD[T, 4] # we'd like this to be the type but I can't match
-    # the requirements of the DType parameter for the SIMD type, because DType
-    # is an object not a trait? If it were a trait I could match it
-    alias Simd = SIMD[DType.float32, 4]
+struct Vec3[T: DType, Tag: AnyType]:
+    alias Simd = SIMD[T, 4]
     var data: Self.Simd
 
     fn __init__(out self, other: Self):
@@ -52,63 +33,73 @@ struct Vec3[#T:
     fn __init__(out self, other: Self.Simd):
         self.data = other
 
-    fn __init__(out self, x: Float32, y: Float32, z: Float32):
+    fn __init__(out self, x: Scalar[T], y: Scalar[T], z: Scalar[T]):
         self.data = Self.Simd(x, y, z, 0)
 
-    fn x(self) -> Float32:
+    fn x(self) -> Scalar[T]:
         return self.data[0]
 
-    fn y(self) -> Float32:
+    fn y(self) -> Scalar[T]:
         return self.data[1]
 
-    fn z(self) -> Float32:
+    fn z(self) -> Scalar[T]:
         return self.data[2]
 
-    fn __add__(self, lhs: Vector) -> Self:
-        return Self(self.data + lhs.data)
+    fn __add__(self: Vector[T], rhs: Vector[T]) -> Vector[T]:
+        return Vector[T](self.data + rhs.data)
 
-    fn __add__(self, lhs: Colour) -> Self:
-        return Self(self.data + lhs.data)
+    fn __add__(self: Point[T], rhs: Vector[T]) -> Point[T]:
+        return Point[T](self.data + rhs.data)
 
-    fn __radd__(self, rhs: Vector) -> Self:
-        return Self(self.data + rhs.data)
+    fn __radd__(self: Point[T], lhs: Vector[T]) -> Vector[T]:
+        return Vector[T](lhs.data + self.data)
 
-    fn __sub__(self, lhs: Point) -> Vector:
-        return Vector(self.data - lhs.data)
+    fn __add__(self: Colour[T], rhs: Colour[T]) -> Colour[T]:
+        return Colour[T](self.data + rhs.data)
 
-    fn __sub__(self, lhs: Vector) -> Vector:
-        return Vector(self.data - lhs.data)
+    fn __sub__(self: Vector[T], rhs: Vector[T]) -> Vector[T]:
+        return Vector[T](self.data - rhs.data)
 
-    fn __mul__(self, lhs: Float32) -> Self:
-        return Self(self.data * lhs)
+    fn __sub__(self: Point[T], rhs: Point[T]) -> Vector[T]:
+        return Vector[T](self.data - rhs.data)
 
-    fn __rmul__(self, rhs: Float32) -> Self:
+    fn __sub__(self: Point[T], rhs: Vector[T]) -> Vector[T]:
+        return Vector[T](self.data - rhs.data)
+
+    fn __rsub__(self: Point[T], lhs: Vector[T]) -> Vector[T]:
+        return Vector[T](lhs.data - self.data)
+
+    fn __mul__(self, rhs: Scalar[T]) -> Self:
         return Self(self.data * rhs)
 
-    fn __truediv__(self, lhs: Float32) -> Self:
-        return Self(self.data / lhs)
+    fn __rmul__(self, lhs: Scalar[T]) -> Self:
+        return Self(lhs * self.data)
+
+    fn __truediv__(self, rhs: Scalar[T]) -> Self:
+        return Self(self.data / rhs)
 
     fn __neg__(self) -> Self:
         return Self(-self.data)
 
-    fn len(self) -> Float32:
+    fn len(self) -> Scalar[T]:
         return sqrt((self.data * self.data).reduce_add())
 
-    fn len_sq(self) -> Float32:
+    fn len_sq(self) -> Scalar[T]:
         return (self.data * self.data).reduce_add()
 
-fn dot(lhs: Vector, rhs: Vector) -> Float32:
+fn dot[T: DType](lhs: Vector[T], rhs: Vector[T]) -> Scalar[T]:
     return (lhs.data * rhs.data).reduce_add()
 
-struct Ray:
-    var origin: Point
-    var dir: Vector
+@register_passable("trivial")
+struct Ray[T: DType]:
+    var origin: Point[T]
+    var dir: Vector[T]
 
-    fn __init__(out self, o: Point, d: Vector):
+    fn __init__(out self, o: Point[T], d: Vector[T]):
         self.origin = o
         self.dir = d
 
-    fn at(self, t: Float32) -> Point:
+    fn at(self, t: Scalar[T]) -> Point[T]:
         return self.origin + t * self.dir
 
 
@@ -119,26 +110,26 @@ def write(name: String, h: Int, w: Int, data: List[InlineArray[UInt8, 3]]):
         for e in data:
             f.write("{} {} {}\n".format(e[0], e[1], e[2]))
 
-fn unit(v: Vector) -> Vector:
+fn unit[T: DType](v: Vector[T]) -> Vector[T]:
     return v / v.len()
 
-fn sky(ray: Ray) -> Colour:
-    t = hit(Point(0, 0, -1), 0.5, ray)
+fn sky[T: DType](ray: Ray[T]) -> Colour[T]:
+    t = hit(Point[T](0, 0, -1), 0.5, ray)
     if t > 0:
-        norm = unit(ray.at(t) - Vector(0, 0, -1))
-        return 0.5 * Colour(norm.x() + 1, norm.y() + 1, norm.z() + 1)
-    var unit_dir: Vector = unit(ray.dir)
+        norm = unit[T](ray.at(t) - Vector[T](0, 0, -1))
+        return 0.5 * Colour[T](norm.x() + 1, norm.y() + 1, norm.z() + 1)
+    var unit_dir: Vector[T] = unit(ray.dir)
     a = 0.5 * (unit_dir.y() + 1.0)
-    return (1.0 - a) * Colour(1.0, 1.0, 1.0) + a * Colour(0.5, 0.7, 1.0)
+    return (1.0 - a) * Colour[T](1.0, 1.0, 1.0) + a * Colour[T](0.5, 0.7, 1.0)
 
-fn convert(colour: Colour) -> InlineArray[UInt8, 3]:
+fn convert[T: DType](colour: Colour[T]) -> InlineArray[UInt8, 3]:
     ret = InlineArray[UInt8, 3](0)
     ret[0] = Int(colour.x() * 255.99)
     ret[1] = Int(colour.y() * 255.99)
     ret[2] = Int(colour.z() * 255.99)
     return ret
 
-fn hit(centre: Point, radius: Float32, ray: Ray) -> Float32:
+fn hit[T: DType](centre: Point[T], radius: Scalar[T], ray: Ray[T]) -> Scalar[T]:
     oc = centre - ray.origin
     a = ray.dir.len_sq()
     h = dot(ray.dir, oc)
@@ -157,12 +148,12 @@ def main():
     var viewport_height: Float32 = 2.0
     viewport_width = viewport_height * image_width / image_height
     var focal_length: Float32 = 1.0
-    camera_centre = Point(0.0, 0.0, 0.0)
-    viewport_u = Vector(viewport_width, 0.0, 0.0)
-    viewport_v = Vector(0.0, -viewport_height, 0.0)
+    camera_centre = Point[DType.float32](0.0, 0.0, 0.0)
+    viewport_u = Vector[DType.float32](viewport_width, 0.0, 0.0)
+    viewport_v = Vector[DType.float32](0.0, -viewport_height, 0.0)
     pixel_delta_u = viewport_u / image_width
     pixel_delta_v = viewport_v / image_height
-    viewport_upper_left = camera_centre - Vector(0.0, 0.0, focal_length)
+    viewport_upper_left = camera_centre - Vector[DType.float32](0.0, 0.0, focal_length)
         - viewport_u / 2.0 - viewport_v / 2.0
     pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v)
 
@@ -171,6 +162,6 @@ def main():
             pixel_centre = pixel00_loc +
                 (i * pixel_delta_u) + (j * pixel_delta_v)
             ray_direction = pixel_centre - camera_centre
-            r = Ray(camera_centre, ray_direction)
+            r = Ray[DType.float32](camera_centre, ray_direction)
             img.append(convert(sky(r)))
     write("file.ppm", image_height, image_width, img)
